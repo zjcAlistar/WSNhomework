@@ -1,0 +1,3 @@
+COMPONENT=node2P
+include $(MAKERULES)
+

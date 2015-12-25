@@ -1,7 +1,7 @@
 #include "Timer.h"
 #include "THLstruct.h"
 
-module node2C @safe()
+module node1C @safe()
 {
   uses {
     interface Boot;
@@ -9,6 +9,7 @@ module node2C @safe()
     interface Timer<TMilli> as Timer0;
     interface Timer<TMilli> as Timer1;
     interface AMSend;
+    interface Receive;
     interface SplitControl as AMControl;
     interface Read<uint16_t> as TRead;
     interface Read<uint16_t> as HRead;
@@ -45,6 +46,12 @@ implementation
   }
 
   event void AMControl.stopDone(error_t err) {
+  }
+  
+  event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+    thlmsg_t *omsg = payload;
+
+    report_received();
   }
 
   event void Timer.fired() {
@@ -96,5 +103,7 @@ implementation
     }
     local.illumination = data;
   }
+
+
 
 }
