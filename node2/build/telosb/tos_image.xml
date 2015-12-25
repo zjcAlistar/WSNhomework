@@ -1,13 +1,13 @@
 <tos_image>
   <ident>
-    <appname>node2P</appname>
+    <uidhash>B7EAE4E4L</uidhash>
+    <timestamp>567D27F9L</timestamp>
     <hostname>zhujunchao-Thin</hostname>
     <platform>telosb</platform>
-    <deluge_support>no</deluge_support>
-    <uidhash>CE94E37DL</uidhash>
-    <timestamp>567BF8C4L</timestamp>
-    <userhash>208FA6F7L</userhash>
     <username>zhujunchao</username>
+    <userhash>208FA6F7L</userhash>
+    <appname>node2P</appname>
+    <deluge_support>no</deluge_support>
   </ident>
   <image format="ihex">
 :104000005542200135D0085A82450E1331400039FF

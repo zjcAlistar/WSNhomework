@@ -5,28 +5,32 @@ implementation {
   components LedsC;
   components node1C;
 
-  components new TimerMilliC() as Timer0;
-  components new TimerMilliC() as Timer1;
+  components new TimerMilliC() as Timer;
+  components new TimerMilliC() as sendTimer;
 
   components ActiveMessageC;
-  components new AMSenderC(AM_THLRADIO);
-  components new AMReceiverC(AM_THLRADIO);
+  components new AMSenderC(AM_THLRADIO) as AMthlSender;
+  components new AMSenderC(AM_THLRADIO) as AMthlTransSender;
+  components new AMReceiverC(AM_THLRADIO) as AMthlTransReceiver;
 
   components new HamamatsuS1087ParC() as LSensor;
   components new SensirionSht11C() as Sensor;
 
 
-  node2C.Boot -> MainC;
-  node2C.Leds -> LedsC;
+  node1C.Boot -> MainC;
+  node1C.Leds -> LedsC;
 
-  node2C.Timer0 -> Timer0;
-  node2C.Timer1 -> Timer1;
+  node1C.Timer -> Timer;
+  node1C.sendTimer -> sendTimer;
 
-  node2C.AMControl -> ActiveMessageC;
-  node2C.AMSend -> AMSenderC;
-  App.Receive -> AMReceiverC;
+  node1C.AMControl -> ActiveMessageC;
+  node1C.AMthlSend -> AMthlSender;
+  node1C.AMthlTransSend -> AMthlTransSender;
   
-  node2C.LRead -> LSensor;
-  node2C.TRead -> Sensor.Temperature;
-  node2C.HRead -> Sensor.Humidity;
+  node1C.Receive -> AMthlTransReceiver;
+  
+  node1C.LRead -> LSensor;
+  node1C.TRead -> Sensor.Temperature;
+  node1C.HRead -> Sensor.Humidity;
+  node1C.AMPacket -> AMthlSender; 
 }

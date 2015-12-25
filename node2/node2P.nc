@@ -5,6 +5,7 @@ implementation {
   components LedsC;
   components node2C;
   components new TimerMilliC() as Timer;
+  components new TimerMilliC() as sendTimer;
   components ActiveMessageC;
   components new AMSenderC(AM_THLRADIO);
   components new HamamatsuS1087ParC() as LSensor;

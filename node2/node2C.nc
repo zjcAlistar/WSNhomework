@@ -7,6 +7,7 @@ module node2C @safe()
     interface Boot;
     interface Leds;
     interface Timer<TMilli> as Timer;
+    interface Timer<TMilli> as sendTimer;
     interface AMSend;
     interface SplitControl as AMControl;
     interface Read<uint16_t> as TRead;
@@ -16,10 +17,17 @@ module node2C @safe()
 }
 implementation
 {
+  enum{
+    MAX_QUEUE_LEN = 30;
+  }
   message_t sendBuf;
   thlmsg_t local;
   uint16_t counter;
-  bool busy = FALSE; 
+  bool busy = FALSE;
+  message_t sendQueue[MAX_QUEUE_LEN];
+  uint16_t queueIn, queueOut;
+  bool full 
+
 
   void report_problem() { call Leds.led0Toggle(); }
   void report_sent() { call Leds.led1Toggle(); }
@@ -29,6 +37,8 @@ implementation
     local.version = 0x1;
     local.interval = TIMER_PERIOD_MILLI;
     local.nodeid = TOS_NODE_ID;
+    queueIn = queueOut = 0;
+
     call AMControl.start();
   }
 

@@ -1,3 +1,3 @@
-COMPONENT=node2P
+COMPONENT=node1P
 include $(MAKERULES)
 
