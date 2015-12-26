@@ -14,8 +14,6 @@ implementation {
   components new AMSenderC(AM_THLRADIO) as AMthlTransSender;
   components new AMSenderC(AM_ACKRADIO) as AMackSender;
   components new AMReceiverC(AM_THLRADIO) as AMthlTransReceiver;
-  components new AMReceiverC(AM_ACKRADIO) as ackReceiver;
-  components new AMReceiverC(AM_FRERADIO) as freReceiver;
 
   components new HamamatsuS1087ParC() as LSensor;
   components new SensirionSht11C() as Sensor;
@@ -36,8 +34,6 @@ implementation {
   node1C.AMackSender -> AMackSender;
   
   node1C.transReceive -> AMthlTransReceiver;
-  node1C.ackReceive -> ackReceiver;
-  node1C.freReceive -> freReceiver;
   
   node1C.LRead -> LSensor;
   node1C.TRead -> Sensor.Temperature;

@@ -15,8 +15,6 @@ module node1C @safe()
     interface AMSend as AMackSender;
 
     interface Receive as transReceive;
-    interface Receive as ackReceive;
-    interface Receive as freReceive;
 
     interface SplitControl as AMControl;
     interface Read<uint16_t> as TRead;
@@ -44,11 +42,14 @@ implementation
   bool ackbusy = FALSE;
   bool transfull = FALSE;
   
+  am_id_t id;
+
   thlmsg_t local;
   thlmsg_t sendQueue[MAX_QUEUE_LEN];
   thlmsg_t transSendQueue[MAX_QUEUE_LEN];
 
   thlack_t tempACK;
+  thlmsg_t* recvpkt;
 
   void report_problem() { call Leds.led0Toggle(); }
   void report_sent() { call Leds.led1Toggle(); }
@@ -85,10 +86,11 @@ implementation
   }
   
   event message_t* transReceive.receive(message_t* msg, void* payload, uint8_t len) {
-    am_id_t id = call AMPacket.type(msg);
+    call Leds.led2Toggle();
+    id = call AMPacket.type(msg);
     if(id == AM_THLRADIO){
-      report_received();
-      thlmsg_t* recvpkt = payload;
+      call Leds.led2Toggle();
+      recvpkt = payload;
       if(recvpkt->counter == lastack+1){
         lastack++;
         tempACK.nodeid = 1;
@@ -113,13 +115,6 @@ implementation
     return msg;
   }
 
-  event message_t* freReceive.receive(message_t* msg, void* payload, uint8_t len) {
-    return msg;
-  }
-
-  event message_t* ackReceive.receive(message_t* msg, void* payload, uint8_t len) {
-    return msg;
-  }
 
   event void Timer.fired() {
     if (call TRead.read() != SUCCESS)
@@ -129,24 +124,22 @@ implementation
     if (call LRead.read() != SUCCESS)
       report_problem();
     local.counter++;
-    atomic{
-      if(!full){
-        sendQueue[queueIn].nodeid = local.nodeid;    
-        sendQueue[queueIn].counter = local.counter;
-        sendQueue[queueIn].interval = local.interval;    
-        sendQueue[queueIn].temperature = local.temperature;
-        sendQueue[queueIn].humidity = local.humidity;
-        sendQueue[queueIn].illumination = local.illumination;
-        sendQueue[queueIn].collecttime = call Timer.getNow();
-        queueIn = (queueIn + 1) % MAX_QUEUE_LEN;
-        if(queueOut == queueIn){
-          full = TRUE;
-        }
+    if(!full){
+      sendQueue[queueIn].nodeid = local.nodeid;    
+      sendQueue[queueIn].counter = local.counter;
+      sendQueue[queueIn].interval = local.interval;    
+      sendQueue[queueIn].temperature = local.temperature;
+      sendQueue[queueIn].humidity = local.humidity;
+      sendQueue[queueIn].illumination = local.illumination;
+      sendQueue[queueIn].collecttime = call Timer.getNow();
+      queueIn = (queueIn + 1) % MAX_QUEUE_LEN;
+      if(queueOut == queueIn){
+        full = TRUE;
       }
-      else{
-        report_problem();
-        local.counter--;
-      }
+    }
+    else{
+      report_problem();
+      local.counter--;
     } 
   }
   
