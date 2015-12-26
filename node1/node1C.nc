@@ -87,6 +87,7 @@ implementation
   event message_t* transReceive.receive(message_t* msg, void* payload, uint8_t len) {
     am_id_t id = call AMPacket.type(msg);
     if(id == AM_THLRADIO){
+      report_received();
       thlmsg_t* recvpkt = payload;
       if(recvpkt->counter == lastack+1){
         lastack++;

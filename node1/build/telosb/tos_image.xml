@@ -1,13 +1,13 @@
 <tos_image>
   <ident>
-    <uidhash>6F1D3978L</uidhash>
-    <username>zhujunchao</username>
-    <timestamp>567E253CL</timestamp>
-    <userhash>208FA6F7L</userhash>
-    <hostname>zhujunchao-Thin</hostname>
-    <appname>node1P</appname>
     <platform>telosb</platform>
+    <uidhash>A6788DF8L</uidhash>
+    <hostname>zhujunchao-Thin</hostname>
     <deluge_support>no</deluge_support>
+    <appname>node1P</appname>
+    <timestamp>567E29FBL</timestamp>
+    <userhash>208FA6F7L</userhash>
+    <username>zhujunchao</username>
   </ident>
   <image format="ihex">
 :104000005542200135D0085A824586153140003985

@@ -8,8 +8,8 @@ enum {
   NODE0_ADDR = 66,
   NODE1_ADDR = 67,
   NODE2_ADDR = 68,
-  TIMER_PERIOD_MILLI = 250,
-  TIMER_PERIOD_SEND = 50
+  TIMER_PERIOD_MILLI = 500,
+  TIMER_PERIOD_SEND = 250
 };
 
 typedef nx_struct thlmsg {
@@ -19,7 +19,7 @@ typedef nx_struct thlmsg {
   nx_uint16_t temperature;
   nx_uint16_t humidity;
   nx_uint16_t illumination;
-  nx_uint16_t collecttime;
+  nx_uint32_t collecttime;
 } thlmsg_t;
 
 typedef nx_struct thlack {

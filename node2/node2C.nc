@@ -21,8 +21,8 @@ module node2C @safe()
 implementation
 {
   enum{
-    MAX_QUEUE_LEN = 30;
-  }
+    MAX_QUEUE_LEN = 30,
+  };
   message_t sendBuf;
   thlmsg_t local;
   thlmsg_t sendQueue[MAX_QUEUE_LEN];
@@ -115,7 +115,7 @@ implementation
       }
       if(!busy){
         memcpy(call AMSend.getPayload(&sendBuf, sizeof(sendQueue[queueOut])), &sendQueue[queueOut], sizeof sendQueue[queueOut]);
-        if(call AMthlSend.send(NODE1_ADDR, &sendBuf, sizeof sendQueue[queueOut]) == SUCCESS) {
+        if(call AMSend.send(NODE1_ADDR, &sendBuf, sizeof sendQueue[queueOut]) == SUCCESS) {
           busy = TRUE;
         }
         if (!busy) report_problem();
