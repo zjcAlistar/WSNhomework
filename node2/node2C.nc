@@ -26,6 +26,7 @@ implementation
   message_t sendBuf;
   thlmsg_t local;
   thlmsg_t sendQueue[MAX_QUEUE_LEN];
+  thlmsg_t* recvpkt;
   uint16_t counter;
   uint16_t queueIn, queueOut;
   uint16_t ack;
@@ -33,14 +34,16 @@ implementation
   bool busy = FALSE;
   bool full = FALSE;
 
+  am_id_t id;
 
   void report_problem() { call Leds.led0Toggle(); }
   void report_sent() { call Leds.led1Toggle(); }
   void report_received() { call Leds.led2Toggle(); }
 
   event void Boot.booted() {
+    local.version = 0x1;
     local.interval = TIMER_PERIOD_MILLI;
-    local.nodeid = TOS_NODE_ID;
+    local.nodeid = 2;
     queueIn = queueOut = 0;
     busy = FALSE;
     full = FALSE;
@@ -70,6 +73,7 @@ implementation
       report_problem();
     local.counter++;
     if(!full){
+      sendQueue[queueIn].version = local.version;
       sendQueue[queueIn].nodeid = local.nodeid;    
       sendQueue[queueIn].counter = local.counter;
       sendQueue[queueIn].interval = local.interval;    
@@ -82,7 +86,7 @@ implementation
         full = TRUE;
       }
     }
-    if(full){
+    else{
       report_problem();
       local.counter--;
     }
@@ -101,6 +105,9 @@ implementation
         sendCount = 0;
       }
       else{
+        if(sendCount > 1){
+          report_problem();
+        }
         if (sendCount >= 3){
           ack = sendQueue[queueOut].counter;
           queueOut = (queueOut + 1) % MAX_QUEUE_LEN;
@@ -138,10 +145,10 @@ implementation
     am_id_t id = call AMPacket.type(msg);
     if(id == AM_ACKRADIO){
       thlack_t* recvpkt = payload;
-      if (recvpkt->nodeid == 1){
+      if (recvpkt->nodeid == 2){
         report_received();
-        if(recvpkt->counter == ack+1){
-          ack++;
+        if(recvpkt->counter > ack){
+          ack = recvpkt->counter;
         }
       }
     }
@@ -149,6 +156,19 @@ implementation
   }
 
   event message_t* freReceive.receive(message_t* msg, void* payload, uint8_t len) {
+    id = call AMPacket.type(msg);
+    if(id == AM_THLRADIO){
+      report_received();
+      recvpkt = payload;
+      if(recvpkt->version == BASE_VERSION){
+        if(recvpkt->interval != local.interval){
+          local.version++;
+          local.interval = recvpkt->interval;
+          call Timer.startPeriodic(local.interval);
+          call sendTimer.startPeriodic(local.interval/2);
+        }       
+      }
+    }
     return msg;
   }
   event void TRead.readDone(error_t result, uint16_t data) {

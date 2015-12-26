@@ -9,7 +9,7 @@ implementation {
   components ActiveMessageC;
   components new AMSenderC(AM_THLRADIO);
   components new AMReceiverC(AM_ACKRADIO) as ackReceiver;
-  components new AMReceiverC(AM_FRERADIO) as freReceiver;
+  components new AMReceiverC(AM_THLRADIO) as freReceiver;
   components new HamamatsuS1087ParC() as LSensor;
   components new SensirionSht11C() as Sensor;
 
