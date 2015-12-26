@@ -51,7 +51,6 @@ implementation
   }
 
   event void Boot.booted() {
-    local.version = 0x1;
     local.interval = TIMER_PERIOD_MILLI;
     local.nodeid = TOS_NODE_ID;
     local.counter = 0;
@@ -79,7 +78,6 @@ implementation
     if(id == 4){
       thlmsg_t* recvpkt = payload;
       if (recvpkt -> nodeid == 2 &&full != TRUE && !qbusy){
-        packetQueue[packetIn].version = recvpkt->version;
         packetQueue[packetIn].interval = recvpkt->interval;
         packetQueue[packetIn].nodeid = 3;
         packetQueue[packetIn].counter = recvpkt->counter;
