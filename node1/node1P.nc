@@ -7,11 +7,15 @@ implementation {
 
   components new TimerMilliC() as Timer;
   components new TimerMilliC() as sendTimer;
+  components new TimerMilliC() as transSendTimer;
 
   components ActiveMessageC;
   components new AMSenderC(AM_THLRADIO) as AMthlSender;
   components new AMSenderC(AM_THLRADIO) as AMthlTransSender;
+  components new AMSenderC(AM_ACKRADIO) as AMackSender;
   components new AMReceiverC(AM_THLRADIO) as AMthlTransReceiver;
+  components new AMReceiverC(AM_ACKRADIO) as ackReceiver;
+  components new AMReceiverC(AM_FRERADIO) as freReceiver;
 
   components new HamamatsuS1087ParC() as LSensor;
   components new SensirionSht11C() as Sensor;
@@ -22,15 +26,20 @@ implementation {
 
   node1C.Timer -> Timer;
   node1C.sendTimer -> sendTimer;
+  node1C.transSendTimer -> transSendTimer;
 
   node1C.AMControl -> ActiveMessageC;
+  node1C.AMPacket -> AMthlSender; 
+
   node1C.AMthlSend -> AMthlSender;
   node1C.AMthlTransSend -> AMthlTransSender;
+  node1C.AMackSender -> AMackSender;
   
-  node1C.Receive -> AMthlTransReceiver;
+  node1C.transReceive -> AMthlTransReceiver;
+  node1C.ackReceive -> ackReceiver;
+  node1C.freReceive -> freReceiver;
   
   node1C.LRead -> LSensor;
   node1C.TRead -> Sensor.Temperature;
   node1C.HRead -> Sensor.Humidity;
-  node1C.AMPacket -> AMthlSender; 
 }

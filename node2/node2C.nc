@@ -9,11 +9,13 @@ module node2C @safe()
     interface Timer<TMilli> as Timer;
     interface Timer<TMilli> as sendTimer;
     interface AMSend;
+    interface Receive as ackReceive;
+    interface Receive as freReceive;
     interface SplitControl as AMControl;
     interface Read<uint16_t> as TRead;
     interface Read<uint16_t> as HRead;
     interface Read<uint16_t> as LRead;
-    interface
+    interface AMPacket;
   }
 }
 implementation
@@ -23,12 +25,12 @@ implementation
   }
   message_t sendBuf;
   thlmsg_t local;
-  uint16_t counter;
-  bool busy = FALSE;
   thlmsg_t sendQueue[MAX_QUEUE_LEN];
+  uint16_t counter;
   uint16_t queueIn, queueOut;
   uint16_t ack;
   uint16_t sendCount;
+  bool busy = FALSE;
   bool full = FALSE;
 
 
@@ -37,7 +39,6 @@ implementation
   void report_received() { call Leds.led2Toggle(); }
 
   event void Boot.booted() {
-    local.version = 0x1;
     local.interval = TIMER_PERIOD_MILLI;
     local.nodeid = TOS_NODE_ID;
     queueIn = queueOut = 0;
@@ -68,42 +69,53 @@ implementation
     if (call LRead.read() != SUCCESS)
       report_problem();
     local.counter++;
-    sendQueue[packetIn].version = local.version;
-    sendQueue[packetIn].interval = local.interval;
-    sendQueue[packetIn].nodeid = local.nodeid;
-    sendQueue[packetIn].counter = local.counter;
-    sendQueue[packetIn].temperature = local.temperature;
-    sendQueue[packetIn].humidity = local.humidity;
-    sendQueue[packetIn].illumination = local.illumination;
-    packetIn = (packetIn + 1) % MAX_QUEUE_LEN;
+    if(!full){
+      sendQueue[queueIn].nodeid = local.nodeid;    
+      sendQueue[queueIn].counter = local.counter;
+      sendQueue[queueIn].interval = local.interval;    
+      sendQueue[queueIn].temperature = local.temperature;
+      sendQueue[queueIn].humidity = local.humidity;
+      sendQueue[queueIn].illumination = local.illumination;
+      sendQueue[queueIn].collecttime = call Timer.getNow();
+      queueIn = (queueIn + 1) % MAX_QUEUE_LEN;
+      if(queueOut == queueIn){
+        full = TRUE;
+      }
+    }
     if(full){
-      packetOut = packetIn;
-      ack = sendQueue[packetOut] - 1; 
+      report_problem();
+      local.counter--;
     }
   }
 
   event void sendTimer.fired() {
-    if(packetIn == packetOut && !full){
+    if(queueIn == queueOut && !full){
       return;
     }
     else{
-      if(sendQueue[packetOut].counter == ack){
-        packetOut = (packetOut + 1) % MAX_QUEUE_LEN;
+      if(sendQueue[queueOut].counter == ack){
+        queueOut = (queueOut + 1) % MAX_QUEUE_LEN;
+        if(full){
+          full = FALSE;
+        }
         sendCount = 0;
       }
       else{
         if (sendCount >= 3){
-          ack = sendQueue[packetOut].counter;
-          packetOut = (packetOut + 1) % MAX_QUEUE_LEN;
+          ack = sendQueue[queueOut].counter;
+          queueOut = (queueOut + 1) % MAX_QUEUE_LEN;
+          if(full){
+            full = FALSE;
+          }
           sendCount = 0;
         }
       }
-      if(packetIn == packetOut && !full){
+      if(queueIn == queueOut && !full){
         return;
       }
       if(!busy){
-        memcpy(call AMSend.getPayload(&sendBuf, sizeof(sendQueue[packetOut])), &sendQueue[packetOut], sizeof sendQueue[packetOut]);
-        if(call AMthlSend.send(69, &sendBuf, sizeof packetQueue[packetOut]) == SUCCESS) {
+        memcpy(call AMSend.getPayload(&sendBuf, sizeof(sendQueue[queueOut])), &sendQueue[queueOut], sizeof sendQueue[queueOut]);
+        if(call AMthlSend.send(NODE1_ADDR, &sendBuf, sizeof sendQueue[queueOut]) == SUCCESS) {
           busy = TRUE;
         }
         if (!busy) report_problem();
@@ -122,35 +134,23 @@ implementation
     busy = FALSE;
   }
   
-  event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+  event message_t* ackReceive.receive(message_t* msg, void* payload, uint8_t len) {
     am_id_t id = call AMPacket.type(msg);
-    if(id == 4){
-      thlmsg_t* recvpkt = payload;
-      if (recvpkt -> nodeid == 2 &&full != TRUE && !qbusy){
-        packetQueue[packetIn].version = recvpkt->version;
-        packetQueue[packetIn].interval = recvpkt->interval;
-        packetQueue[packetIn].nodeid = 3;
-        packetQueue[packetIn].counter = recvpkt->counter;
-        packetQueue[packetIn].temperature = recvpkt->temperature;
-        packetQueue[packetIn].humidity = recvpkt->humidity;
-        packetQueue[packetIn].illumination = recvpkt->illumination;
-        packetIn = (packetIn + 1) % PACKET_QUEUE_LEN;
-      }
-      else{
-       report_problem();
-      }
-      if (packetIn == packetOut)
-        full = TRUE;
-
-      if (!qbusy)
-      {
-        post sendTask();
-        qbusy = TRUE;
+    if(id == AM_ACKRADIO){
+      thlack_t* recvpkt = payload;
+      if (recvpkt->nodeid == 1){
+        report_received();
+        if(recvpkt->counter == ack+1){
+          ack++;
+        }
       }
     }
     return msg;
   }
 
+  event message_t* freReceive.receive(message_t* msg, void* payload, uint8_t len) {
+    return msg;
+  }
   event void TRead.readDone(error_t result, uint16_t data) {
     if (result != SUCCESS){
         data = 0xffff;

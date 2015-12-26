@@ -8,9 +8,16 @@ module node1C @safe()
     interface Leds;
     interface Timer<TMilli> as Timer;
     interface Timer<TMilli> as sendTimer;
+    interface Timer<TMilli> as transSendTimer;
+
     interface AMSend as AMthlSend;
     interface AMSend as AMthlTransSend;
-    interface Receive;
+    interface AMSend as AMackSender;
+
+    interface Receive as transReceive;
+    interface Receive as ackReceive;
+    interface Receive as freReceive;
+
     interface SplitControl as AMControl;
     interface Read<uint16_t> as TRead;
     interface Read<uint16_t> as HRead;
@@ -21,49 +28,53 @@ module node1C @safe()
 implementation
 {
   enum {
-    PACKET_QUEUE_LEN = 30,
+    MAX_QUEUE_LEN = 30,
   };
-  message_t sendBuf[PACKET_QUEUE_LEN];
-  thlmsg_t local;
-  bool busy = FALSE;
-  bool qbusy = FALSE;
-  bool full = FALSE;
-  thlmsg_t packetQueue[PACKET_QUEUE_LEN];
+  message_t sendBuf;
+  message_t transSendBuf;
+  message_t ackSendBuf;
 
-  uint8_t    packetIn, packetOut;
+  uint16_t queueIn, queueOut;
+  uint16_t transQueueIn, transQueueOut;
+  uint16_t lastack;
+  uint16_t sendCount;
+  bool busy = FALSE;
+  bool full = FALSE;
+  bool transbusy = FALSE;
+  bool ackbusy = FALSE;
+  bool transfull = FALSE;
+  
+  thlmsg_t local;
+  thlmsg_t sendQueue[MAX_QUEUE_LEN];
+  thlmsg_t transSendQueue[MAX_QUEUE_LEN];
+
+  thlack_t tempACK;
 
   void report_problem() { call Leds.led0Toggle(); }
   void report_sent() { call Leds.led1Toggle(); }
   void report_received() { call Leds.led2Toggle(); }
 
-  task void sendTask() {
-    atomic
-      if (packetIn == packetOut && !full)
-      {
-        qbusy = FALSE;
-        return;
-      }
-    memcpy(call AMthlSend.getPayload(&sendBuf[packetOut], sizeof(packetQueue[packetOut])), &packetQueue[packetOut], sizeof packetQueue[packetOut]);
-    if(call AMthlSend.send(69, &sendBuf[packetOut], sizeof packetQueue[packetOut]) == SUCCESS) {
-        busy = TRUE;
-      }
-    if (!busy) report_problem();
-  }
-
   event void Boot.booted() {
     local.interval = TIMER_PERIOD_MILLI;
     local.nodeid = TOS_NODE_ID;
     local.counter = 0;
-    packetIn = packetOut = 0;
+    queueIn = queueOut = 0;
+    transQueueIn = transQueueOut = 0;
+    lastack = 0;
+    sendCount = 0;
     full = FALSE;
     busy = FALSE;
-    qbusy = FALSE;
+    transfull = FALSE;
+    transbusy = FALSE;
+    ackbusy = FALSE;
     call AMControl.start();
   }
 
   event void AMControl.startDone(error_t err) {
     if (err == SUCCESS) {
       call Timer.startPeriodic(TIMER_PERIOD_MILLI);
+      call sendTimer.startPeriodic(TIMER_PERIOD_SEND);
+      call transSendTimer.startPeriodic(TIMER_PERIOD_SEND);
     }
     else {
       call AMControl.start();
@@ -73,31 +84,39 @@ implementation
   event void AMControl.stopDone(error_t err) {
   }
   
-  event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+  event message_t* transReceive.receive(message_t* msg, void* payload, uint8_t len) {
     am_id_t id = call AMPacket.type(msg);
-    if(id == 4){
+    if(id == AM_THLRADIO){
       thlmsg_t* recvpkt = payload;
-      if (recvpkt -> nodeid == 2 &&full != TRUE && !qbusy){
-        packetQueue[packetIn].interval = recvpkt->interval;
-        packetQueue[packetIn].nodeid = 3;
-        packetQueue[packetIn].counter = recvpkt->counter;
-        packetQueue[packetIn].temperature = recvpkt->temperature;
-        packetQueue[packetIn].humidity = recvpkt->humidity;
-        packetQueue[packetIn].illumination = recvpkt->illumination;
-        packetIn = (packetIn + 1) % PACKET_QUEUE_LEN;
-      }
-      else{
-       report_problem();
-      }
-      if (packetIn == packetOut)
-        full = TRUE;
+      if(recvpkt->counter == lastack+1){
+        lastack++;
+        tempACK.nodeid = 1;
+        tempACK.counter = recvpkt->counter;
+        if (!ackbusy) {
+          memcpy(call AMackSender.getPayload(&ackSendBuf, sizeof(tempACK)), &tempACK, sizeof tempACK);
+          if (call AMackSender.send(NODE2_ADDR, &ackSendBuf, sizeof tempACK) == SUCCESS) {
+            ackbusy = TRUE;
+          }
+        }
+        if (!ackbusy) report_problem();
 
-      if (!qbusy)
-      {
-        post sendTask();
-        qbusy = TRUE;
+        if (!transbusy) {
+          memcpy(call AMthlTransSend.getPayload(&transSendBuf, sizeof(*recvpkt)), recvpkt, sizeof *recvpkt);
+          if (call AMthlTransSend.send(NODE0_ADDR, &transSendBuf, sizeof *recvpkt) == SUCCESS) {
+            transbusy = TRUE;
+          }
+        }
+        if (!transbusy) report_problem();
       }
     }
+    return msg;
+  }
+
+  event message_t* freReceive.receive(message_t* msg, void* payload, uint8_t len) {
+    return msg;
+  }
+
+  event message_t* ackReceive.receive(message_t* msg, void* payload, uint8_t len) {
     return msg;
   }
 
@@ -109,49 +128,75 @@ implementation
     if (call LRead.read() != SUCCESS)
       report_problem();
     local.counter++;
-    if(full != TRUE && !qbusy){
-      packetQueue[packetIn].version = local.version;
-      packetQueue[packetIn].interval = local.interval;
-      packetQueue[packetIn].nodeid = local.nodeid;
-      packetQueue[packetIn].counter = local.counter;
-      packetQueue[packetIn].temperature = local.temperature;
-      packetQueue[packetIn].humidity = local.humidity;
-      packetQueue[packetIn].illumination = local.illumination;
-      packetIn = (packetIn + 1) % PACKET_QUEUE_LEN;
-    }
-    else{
-      report_problem();
-    }
-    if (packetIn == packetOut)
-      full = TRUE;
-
-    if (!qbusy)
-      {
-        post sendTask();
-        qbusy = TRUE;
+    atomic{
+      if(!full){
+        sendQueue[queueIn].nodeid = local.nodeid;    
+        sendQueue[queueIn].counter = local.counter;
+        sendQueue[queueIn].interval = local.interval;    
+        sendQueue[queueIn].temperature = local.temperature;
+        sendQueue[queueIn].humidity = local.humidity;
+        sendQueue[queueIn].illumination = local.illumination;
+        sendQueue[queueIn].collecttime = call Timer.getNow();
+        queueIn = (queueIn + 1) % MAX_QUEUE_LEN;
+        if(queueOut == queueIn){
+          full = TRUE;
+        }
       }
+      else{
+        report_problem();
+        local.counter--;
+      }
+    } 
   }
-
-  event void AMthlSend.sendDone(message_t* msg, error_t err) {
-    if (err != SUCCESS)
-      report_problem();
+  
+  event void sendTimer.fired(){
+    if(queueIn == queueOut && !full){
+      return;
+    }
     else{
-      atomic{
-        if (++packetOut >= PACKET_QUEUE_LEN)
-        packetOut = 0;
-      if (full)
+      if(!busy){
+        memcpy(call AMthlSend.getPayload(&sendBuf, sizeof(sendQueue[queueOut])), &sendQueue[queueOut], sizeof sendQueue[queueOut]);
+        if(call AMthlSend.send(NODE0_ADDR, &sendBuf, sizeof sendQueue[queueOut]) == SUCCESS) {
+          busy = TRUE;
+        }
+      if (!busy) report_problem();
+      }
+      queueOut = (queueOut + 1) % MAX_QUEUE_LEN;
+      if(full){
         full = FALSE;
-      report_sent();
       }
     }
-    busy = FALSE;
-    post sendTask();
-  }
-
-  event void AMthlTransSend.sendDone(message_t* msg, error_t err) {
     
   }
 
+  event void transSendTimer.fired(){}
+
+  event void AMthlSend.sendDone(message_t* msg, error_t err) {
+    if (err == SUCCESS){
+      report_sent();
+    }
+    else
+      report_problem();
+    busy = FALSE;
+  }
+
+  event void AMthlTransSend.sendDone(message_t* msg, error_t err) {
+    if (err == SUCCESS){
+      report_sent();
+    }
+    else
+      report_problem();
+    transbusy = FALSE;
+  }
+
+  event void AMackSender.sendDone(message_t* msg, error_t err) {
+    if (err == SUCCESS){
+      report_sent();
+    }
+    else
+      report_problem();
+    ackbusy = FALSE;
+  }
 
   event void TRead.readDone(error_t result, uint16_t data) {
     if (result != SUCCESS){
